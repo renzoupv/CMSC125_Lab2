@@ -15,6 +15,7 @@ int main(int argc, char *argv[]) {
     char *input_file = NULL;
     char *cli_processes = NULL;
     char *mlfq_config_file = NULL;
+    int compare = 0;
 
     // Default MLFQ config
     int q0_q = 10, q0_a = 50;
@@ -25,23 +26,21 @@ int main(int argc, char *argv[]) {
     // ARGUMENT PARSING
     // ----------------------------
     for (int i = 1; i < argc; i++) {
-
-        if (strncmp(argv[i], "--algorithm=", 12) == 0) {
+        if (strcmp(argv[i], "--compare") == 0) {
+            compare = 1;
+        }
+        else if (strncmp(argv[i], "--algorithm=", 12) == 0) {
             algorithm = argv[i] + 12;
         }
-
         else if (strncmp(argv[i], "--quantum=", 10) == 0) {
             quantum = atoi(argv[i] + 10);
         }
-
         else if (strncmp(argv[i], "--input=", 8) == 0) {
             input_file = argv[i] + 8;
         }
-
         else if (strncmp(argv[i], "--processes=", 12) == 0) {
             cli_processes = argv[i] + 12;
         }
-        
         else if (strncmp(argv[i], "--mlfq-config=", 14) == 0) {
             mlfq_config_file = argv[i] + 14;
         }
@@ -65,7 +64,6 @@ int main(int argc, char *argv[]) {
     // ----------------------------
     // LOAD INPUT
     // ----------------------------
-    // ... (rest of input loading) ...
     if (input_file != NULL) {
         n = parse_file(input_file, processes);
     }
@@ -83,8 +81,56 @@ int main(int argc, char *argv[]) {
     }
 
     // ----------------------------
-    // RUN SCHEDULER
+    // COMPARISON MODE
     // ----------------------------
+    if (compare) {
+        printf("\n=== Algorithm Comparison for %s ===\n", input_file ? input_file : "CLI input");
+        printf("\nAlgorithm | Avg TT | Avg WT | Avg RT | Context Switches\n");
+        printf("----------|--------|--------|--------|------------------\n");
+
+        char *algs[] = {"FCFS", "SJF", "STCF", "RR", "MLFQ"};
+        for (int i = 0; i < 5; i++) {
+            Process temp_p[MAX_PROCESSES];
+            memcpy(temp_p, processes, sizeof(Process) * n);
+            
+            SchedulerState ts;
+            GanttChart tg;
+            init_gantt(&tg);
+            ts.processes = temp_p;
+            ts.n = n;
+            ts.time = 0;
+            ts.gantt = &tg;
+            ts.q0_quantum = q0_q; ts.q0_allotment = q0_a;
+            ts.q1_quantum = q1_q; ts.q1_allotment = q1_a;
+            ts.boost_period = boost;
+            ts.log_ptr = 0; ts.preemption_log[0] = '\0';
+            ts.context_switches = 0;
+
+            if (strcmp(algs[i], "FCFS") == 0) run_fcfs(&ts);
+            else if (strcmp(algs[i], "SJF") == 0) run_sjf(&ts);
+            else if (strcmp(algs[i], "STCF") == 0) run_stcf(&ts);
+            else if (strcmp(algs[i], "RR") == 0) run_rr(&ts, quantum);
+            else if (strcmp(algs[i], "MLFQ") == 0) run_mlfq(&ts);
+
+            calculate_metrics(temp_p, n);
+            printf("%-9s | %6.1f | %6.1f | %6.1f | %16d\n",
+                   algs[i],
+                   avg_turnaround(temp_p, n),
+                   avg_waiting(temp_p, n),
+                   avg_response(temp_p, n),
+                   ts.context_switches);
+        }
+        return 0;
+    }
+
+    // ----------------------------
+    // SINGLE ALGORITHM MODE
+    // ----------------------------
+    if (algorithm == NULL) {
+        printf("Error: No algorithm specified. Use --algorithm or --compare\n");
+        return 1;
+    }
+
     if (strcmp(algorithm, "RR") == 0) {
         printf("\nUsing time quantum q=%d\n", quantum);
     }
@@ -101,6 +147,7 @@ int main(int argc, char *argv[]) {
     s.q1_quantum = q1_q; s.q1_allotment = q1_a;
     s.boost_period = boost;
     s.log_ptr = 0; s.preemption_log[0] = '\0';
+    s.context_switches = 0;
 
     int status = -1;
     if (strcmp(algorithm, "FCFS") == 0) { run_fcfs(&s); status = 0; }
@@ -110,7 +157,7 @@ int main(int argc, char *argv[]) {
     else if (strcmp(algorithm, "MLFQ") == 0) { run_mlfq(&s); status = 0; }
 
     if (status != 0) {
-        printf("Scheduling failed\n");
+        printf("Scheduling failed: algorithm '%s' not recognized\n", algorithm);
         return 1;
     }
 

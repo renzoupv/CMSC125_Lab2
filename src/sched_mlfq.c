@@ -54,6 +54,7 @@ void run_mlfq(SchedulerState *s) {
 
     int time = 0;
     int last_boost = 0;
+    Process *last_p = NULL;
 
     printf("\n=== MLFQ Configuration ===\n");
     printf("Queue 0: q=%d, allotment=%d (highest priority)\n", s->q0_quantum, s->q0_allotment);
@@ -113,12 +114,16 @@ void run_mlfq(SchedulerState *s) {
         }
         else if (!is_empty(&q2)) {
             current = dequeue(&q2);
-            quantum = current->remaining_time;
+            quantum = 1000000; // FCFS runs until completion
         }
 
         if (current == NULL) {
             time++;
             continue;
+        }
+
+        if (last_p != NULL && last_p != current) {
+            s->context_switches++;
         }
 
         if (current->start_time == -1) {
@@ -151,6 +156,8 @@ void run_mlfq(SchedulerState *s) {
             if (time - last_boost >= s->boost_period) break;
             if (preempted) break;
         }
+
+        last_p = current;
 
         if (current->remaining_time == 0) {
             current->finish_time = time;
