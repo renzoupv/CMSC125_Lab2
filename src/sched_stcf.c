@@ -41,6 +41,7 @@ void run_stcf(SchedulerState *s) {
         Process *p = &s->processes[idx];
 
         if (last_idx != -1 && last_idx != idx) {
+            s->context_switches++;
             Process *last_p = &s->processes[last_idx];
             if (last_p->remaining_time > 0) {
                 s->log_ptr += sprintf(s->preemption_log + s->log_ptr, 

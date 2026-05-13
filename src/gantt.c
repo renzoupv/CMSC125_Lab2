@@ -8,7 +8,7 @@ void init_gantt(GanttChart *g) {
 
 void add_gantt_entry(GanttChart *g, char *pid, int time) {
     if (g->count > 0 && strcmp(g->pids[g->count - 1], pid) == 0) {
-        g->times[g->count] = time; // Update end time of current block
+        g->times[g->count - 1] = time; // Update end time of current block
         return;
     }
     if (g->count < MAX_TIMELINE) {
@@ -28,13 +28,23 @@ void print_gantt_chart(GanttChart *g) {
         int duration = (i == 0) ? g->times[0] : (g->times[i] - g->times[i-1]);
         if (duration <= 0) continue;
         
+        int scale = (duration + 19) / 20; // Scale: 1 char per 20 units
         printf("[%s", g->pids[i]);
-        for (int j = 0; j < duration / 10; j++) printf("-");
+        for (int j = 0; j < scale; j++) printf("-");
         printf("]");
     }
+    
     printf("\nTime: 0");
     for (int i = 0; i < g->count; i++) {
-        printf("       %d", g->times[i]);
+        int duration = (i == 0) ? g->times[0] : (g->times[i] - g->times[i-1]);
+        if (duration <= 0) continue;
+        
+        int scale = (duration + 19) / 20;
+        int width = strlen(g->pids[i]) + 2 + scale;
+        
+        // Print spaces to align next marker
+        for (int j = 0; j < width - 1; j++) printf(" ");
+        printf("%d", g->times[i]);
     }
     printf("\n");
 }
