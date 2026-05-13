@@ -1,36 +1,29 @@
 #include <stdio.h>
 #include <string.h>
 #include "scheduler.h"
-
-// algorithm headers
-int run_fcfs(Process *p, int n);
-int run_sjf(Process *p, int n);
-int run_stcf(Process *p, int n);
-int run_rr(Process *p, int n, int quantum);
-int run_mlfq(Process *p, int n);
+#include "metrics.h"
 
 int schedule(Process *processes, int n, char *algorithm, int quantum) {
+    SchedulerState s;
+    s.processes = processes;
+    s.n = n;
+    s.time = 0;
 
     if (strcmp(algorithm, "FCFS") == 0) {
-        return run_fcfs(processes, n);
+        run_fcfs(&s);
+    } else if (strcmp(algorithm, "SJF") == 0) {
+        run_sjf(&s);
+    } else if (strcmp(algorithm, "STCF") == 0) {
+        run_stcf(&s);
+    } else if (strcmp(algorithm, "RR") == 0) {
+        run_rr(&s, quantum);
+    } else if (strcmp(algorithm, "MLFQ") == 0) {
+        run_mlfq(&s);
+    } else {
+        printf("Unknown algorithm: %s\n", algorithm);
+        return -1;
     }
 
-    if (strcmp(algorithm, "SJF") == 0) {
-        return run_sjf(processes, n);
-    }
-
-    if (strcmp(algorithm, "STCF") == 0) {
-        return run_stcf(processes, n);
-    }
-
-    if (strcmp(algorithm, "RR") == 0) {
-        return run_rr(processes, n, quantum);
-    }
-
-    if (strcmp(algorithm, "MLFQ") == 0) {
-        return run_mlfq(processes, n);
-    }
-
-    printf("Unknown algorithm: %s\n", algorithm);
-    return -1;
+    calculate_metrics(processes, n);
+    return 0;
 }
