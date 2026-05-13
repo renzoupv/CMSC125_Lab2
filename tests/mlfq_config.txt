@@ -1,0 +1,4 @@
+# Multi-Level Feedback Queue Configuration
+Q0 10 50
+Q1 30 150
+BOOST_PERIOD 200

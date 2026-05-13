@@ -24,4 +24,4 @@ schedsim: $(OBJS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f schedsim $(OBJS)
+	rm -f src/*.o schedsim

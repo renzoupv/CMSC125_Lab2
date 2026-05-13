@@ -5,8 +5,6 @@
 #include "scheduler.h"
 #include "metrics.h"
 
-#define MAX_PROCESSES 100
-
 int main(int argc, char *argv[]) {
 
     Process processes[MAX_PROCESSES];
@@ -16,6 +14,12 @@ int main(int argc, char *argv[]) {
     int quantum = 30;
     char *input_file = NULL;
     char *cli_processes = NULL;
+    char *mlfq_config_file = NULL;
+
+    // Default MLFQ config
+    int q0_q = 10, q0_a = 50;
+    int q1_q = 30, q1_a = 150;
+    int boost = 200;
 
     // ----------------------------
     // ARGUMENT PARSING
@@ -34,14 +38,34 @@ int main(int argc, char *argv[]) {
             input_file = argv[i] + 8;
         }
 
-        else if (strncmp(argv[i], "--processes=", 13) == 0) {
-            cli_processes = argv[i] + 13;
+        else if (strncmp(argv[i], "--processes=", 12) == 0) {
+            cli_processes = argv[i] + 12;
+        }
+        
+        else if (strncmp(argv[i], "--mlfq-config=", 14) == 0) {
+            mlfq_config_file = argv[i] + 14;
+        }
+    }
+    
+    // Parse MLFQ config if provided
+    if (mlfq_config_file != NULL) {
+        FILE *fp = fopen(mlfq_config_file, "r");
+        if (fp) {
+            char line[128];
+            while (fgets(line, sizeof(line), fp)) {
+                if (line[0] == '#' || strlen(line) < 3) continue;
+                if (strncmp(line, "Q0", 2) == 0) sscanf(line, "Q0 %d %d", &q0_q, &q0_a);
+                else if (strncmp(line, "Q1", 2) == 0) sscanf(line, "Q1 %d %d", &q1_q, &q1_a);
+                else if (strncmp(line, "BOOST_PERIOD", 12) == 0) sscanf(line, "BOOST_PERIOD %d", &boost);
+            }
+            fclose(fp);
         }
     }
 
     // ----------------------------
     // LOAD INPUT
     // ----------------------------
+    // ... (rest of input loading) ...
     if (input_file != NULL) {
         n = parse_file(input_file, processes);
     }
@@ -61,27 +85,55 @@ int main(int argc, char *argv[]) {
     // ----------------------------
     // RUN SCHEDULER
     // ----------------------------
+    if (strcmp(algorithm, "RR") == 0) {
+        printf("\nUsing time quantum q=%d\n", quantum);
+    }
     printf("\nRunning %s Scheduler...\n", algorithm);
 
-    if (schedule(processes, n, algorithm, quantum) != 0) {
+    SchedulerState s;
+    GanttChart g;
+    init_gantt(&g);
+    s.processes = processes;
+    s.n = n;
+    s.time = 0;
+    s.gantt = &g;
+    s.q0_quantum = q0_q; s.q0_allotment = q0_a;
+    s.q1_quantum = q1_q; s.q1_allotment = q1_a;
+    s.boost_period = boost;
+    s.log_ptr = 0; s.preemption_log[0] = '\0';
+
+    int status = -1;
+    if (strcmp(algorithm, "FCFS") == 0) { run_fcfs(&s); status = 0; }
+    else if (strcmp(algorithm, "SJF") == 0) { run_sjf(&s); status = 0; }
+    else if (strcmp(algorithm, "STCF") == 0) { run_stcf(&s); status = 0; }
+    else if (strcmp(algorithm, "RR") == 0) { run_rr(&s, quantum); status = 0; }
+    else if (strcmp(algorithm, "MLFQ") == 0) { run_mlfq(&s); status = 0; }
+
+    if (status != 0) {
         printf("Scheduling failed\n");
         return 1;
     }
 
+    print_gantt_chart(&g);
+    calculate_metrics(processes, n);
+
     // ----------------------------
     // METRICS OUTPUT
     // ----------------------------
-    printf("\n=== Metrics Summary ===\n");
+    print_metrics(processes, n);
 
-    for (int i = 0; i < n; i++) {
-        printf("Process %s | TT=%d | WT=%d | RT=%d\n",
-               processes[i].pid,
-               processes[i].turnaround_time,
-               processes[i].waiting_time,
-               processes[i].response_time);
+    if (strcmp(algorithm, "STCF") == 0 && s.preemption_log[0] != '\0') {
+        printf("\n%s", s.preemption_log);
     }
 
-    print_average_metrics(processes, n);
+    if (strcmp(algorithm, "RR") == 0) {
+        printf("\nTotal context switches: %d\n", s.context_switches);
+        printf("Average response time: %.1f\n", avg_response(processes, n));
+    }
+    
+    if (strcmp(algorithm, "FCFS") == 0) {
+        check_convoy_effect(processes, n);
+    }
 
     return 0;
 }
