@@ -1,6 +1,6 @@
 #include "scheduler.h"
 
-static int pick_sjf(SchedulerState s, int time) {
+static int pick_sjf(SchedulerState *s, int time) {
     int idx = -1;
 
     for (int i = 0; i < s->n; i++) {
@@ -16,7 +16,7 @@ static int pick_sjf(SchedulerState s, int time) {
     return idx;
 }
 
-void run_sjf(SchedulerStates) {
+void run_sjf(SchedulerState *s) {
     int time = 0;
 
     for (;;) {
