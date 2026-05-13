@@ -29,6 +29,7 @@ void run_fcfs(SchedulerState *s) {
                 p->start_time = time;
 
             p->remaining_time--;
+            add_gantt_entry(s->gantt, p->pid, time + 1);
 
             if (p->remaining_time == 0)
                 p->finish_time = time + 1;

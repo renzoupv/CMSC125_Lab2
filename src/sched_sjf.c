@@ -42,6 +42,7 @@ void run_sjf(SchedulerState *s) {
         while (p->remaining_time > 0) {
             p->remaining_time--;
             time++;
+            add_gantt_entry(s->gantt, p->pid, time);
         }
 
         p->finish_time = time;

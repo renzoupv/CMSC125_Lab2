@@ -1,22 +1,40 @@
 #include <stdio.h>
-#include "process.h"
+#include <string.h>
+#include "gantt.h"
 
-// simple gantt chart from execution log
-void print_gantt(char timeline[], int size) {
+void init_gantt(GanttChart *g) {
+    g->count = 0;
+}
+
+void add_gantt_entry(GanttChart *g, char *pid, int time) {
+    if (g->count > 0 && strcmp(g->pids[g->count - 1], pid) == 0) {
+        g->times[g->count] = time; // Update end time of current block
+        return;
+    }
+    if (g->count < MAX_TIMELINE) {
+        strcpy(g->pids[g->count], pid);
+        g->times[g->count] = time;
+        g->count++;
+    }
+}
+
+void print_gantt_chart(GanttChart *g) {
+    if (g->count == 0) return;
 
     printf("\n=== Gantt Chart ===\n");
 
-    // top bar
-    for (int i = 0; i < size; i++) {
-        printf("[%c]", timeline[i]);
+    // Print blocks
+    for (int i = 0; i < g->count; i++) {
+        int duration = (i == 0) ? g->times[0] : (g->times[i] - g->times[i-1]);
+        if (duration <= 0) continue;
+        
+        printf("[%s", g->pids[i]);
+        for (int j = 0; j < duration / 10; j++) printf("-");
+        printf("]");
     }
-
-    printf("\n0");
-
-    // time markers
-    for (int i = 10; i < size; i += 10) {
-        printf("   %d", i);
+    printf("\nTime: 0");
+    for (int i = 0; i < g->count; i++) {
+        printf("       %d", g->times[i]);
     }
-
     printf("\n");
 }

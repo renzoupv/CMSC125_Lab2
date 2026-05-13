@@ -10,6 +10,6 @@ double avg_waiting(Process *processes, int n);
 double avg_response(Process *processes, int n);
 
 void print_metrics(Process *processes, int n);
-void print_average_metrics(Process *processes, int n);
+void check_convoy_effect(Process *processes, int n);
 
 #endif

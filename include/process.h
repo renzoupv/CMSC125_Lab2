@@ -1,6 +1,8 @@
 #ifndef PROCESS_H
 #define PROCESS_H
 
+#define MAX_PROCESSES 100
+
 typedef struct {
     char pid[16];
     int arrival_time;
@@ -16,6 +18,8 @@ typedef struct {
 
     int priority;
     int time_in_queue;
+    int allotment_remaining;
+    int current_queue;
 } Process;
 
 void init_process(Process *p, char *pid, int at, int bt);
