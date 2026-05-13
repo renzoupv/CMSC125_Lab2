@@ -1,40 +1,87 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "scheduler.h"
 #include "process.h"
+#include "scheduler.h"
+#include "metrics.h"
 
-void compute_all(Process *p, int n) {
+#define MAX_PROCESSES 100
+
+int main(int argc, char *argv[]) {
+
+    Process processes[MAX_PROCESSES];
+    int n = 0;
+
+    char *algorithm = NULL;
+    int quantum = 30;
+    char *input_file = NULL;
+    char *cli_processes = NULL;
+
+    // ----------------------------
+    // ARGUMENT PARSING
+    // ----------------------------
+    for (int i = 1; i < argc; i++) {
+
+        if (strncmp(argv[i], "--algorithm=", 12) == 0) {
+            algorithm = argv[i] + 12;
+        }
+
+        else if (strncmp(argv[i], "--quantum=", 10) == 0) {
+            quantum = atoi(argv[i] + 10);
+        }
+
+        else if (strncmp(argv[i], "--input=", 8) == 0) {
+            input_file = argv[i] + 8;
+        }
+
+        else if (strncmp(argv[i], "--processes=", 13) == 0) {
+            cli_processes = argv[i] + 13;
+        }
+    }
+
+    // ----------------------------
+    // LOAD INPUT
+    // ----------------------------
+    if (input_file != NULL) {
+        n = parse_file(input_file, processes);
+    }
+    else if (cli_processes != NULL) {
+        n = parse_cli(cli_processes, processes);
+    }
+    else {
+        printf("Error: No input provided\n");
+        return 1;
+    }
+
+    if (n <= 0) {
+        printf("Error: No processes loaded\n");
+        return 1;
+    }
+
+    // ----------------------------
+    // RUN SCHEDULER
+    // ----------------------------
+    printf("\nRunning %s Scheduler...\n", algorithm);
+
+    if (schedule(processes, n, algorithm, quantum) != 0) {
+        printf("Scheduling failed\n");
+        return 1;
+    }
+
+    // ----------------------------
+    // METRICS OUTPUT
+    // ----------------------------
+    printf("\n=== Metrics Summary ===\n");
+
     for (int i = 0; i < n; i++) {
-        p[i].turnaround_time = p[i].finish_time - p[i].arrival_time;
-        p[i].waiting_time = p[i].turnaround_time - p[i].burst_time;
-        p[i].response_time = p[i].start_time - p[i].arrival_time;
+        printf("Process %s | TT=%d | WT=%d | RT=%d\n",
+               processes[i].pid,
+               processes[i].turnaround_time,
+               processes[i].waiting_time,
+               processes[i].response_time);
     }
-}
 
-int main(int argc, char **argv) {
-    Process processes[5];
-
-    init_process(&processes[0], "A", 0, 240);
-    init_process(&processes[1], "B", 10, 180);
-    init_process(&processes[2], "C", 20, 150);
-    init_process(&processes[3], "D", 25, 80);
-    init_process(&processes[4], "E", 30, 130);
-
-    SchedulerState state = {processes, 5, 0};
-
-    run_fcfs(&state);
-
-    compute_all(processes, 5);
-
-    printf("=== FCFS DONE ===\n");
-    for (int i = 0; i < 5; i++) {
-        printf("%s TT=%d WT=%d RT=%d\n",
-            processes[i].pid,
-            processes[i].turnaround_time,
-            processes[i].waiting_time,
-            processes[i].response_time);
-    }
+    print_average_metrics(processes, n);
 
     return 0;
 }
