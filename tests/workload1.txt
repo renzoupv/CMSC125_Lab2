@@ -1,0 +1,7 @@
+# General workload test
+# PID Arrival Burst
+P1 0 100
+P2 20 30
+P3 40 60
+P4 60 20
+P5 80 40

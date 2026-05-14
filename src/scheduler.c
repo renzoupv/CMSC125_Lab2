@@ -12,21 +12,17 @@ int schedule(Process *processes, int n, char *algorithm, int quantum) {
     s.n = n;
     s.time = 0;
     s.gantt = &g;
+    s.context_switches = 0;
+    s.log_ptr = 0;
+    s.preemption_log[0] = '\0';
+    s.alg_data = NULL;
 
-    if (strcmp(algorithm, "FCFS") == 0) {
-        run_fcfs(&s);
-    } else if (strcmp(algorithm, "SJF") == 0) {
-        run_sjf(&s);
-    } else if (strcmp(algorithm, "STCF") == 0) {
-        run_stcf(&s);
-    } else if (strcmp(algorithm, "RR") == 0) {
-        run_rr(&s, quantum);
-    } else if (strcmp(algorithm, "MLFQ") == 0) {
-        run_mlfq(&s);
-    } else {
-        printf("Unknown algorithm: %s\n", algorithm);
-        return -1;
-    }
+    // MLFQ Defaults if needed
+    s.q0_quantum = 10; s.q0_allotment = 50;
+    s.q1_quantum = 30; s.q1_allotment = 150;
+    s.boost_period = 200;
+
+    simulate_scheduler(&s, algorithm, quantum);
 
     print_gantt_chart(&g);
     calculate_metrics(processes, n);

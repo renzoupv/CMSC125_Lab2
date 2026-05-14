@@ -105,12 +105,9 @@ int main(int argc, char *argv[]) {
             ts.boost_period = boost;
             ts.log_ptr = 0; ts.preemption_log[0] = '\0';
             ts.context_switches = 0;
+            ts.alg_data = NULL;
 
-            if (strcmp(algs[i], "FCFS") == 0) run_fcfs(&ts);
-            else if (strcmp(algs[i], "SJF") == 0) run_sjf(&ts);
-            else if (strcmp(algs[i], "STCF") == 0) run_stcf(&ts);
-            else if (strcmp(algs[i], "RR") == 0) run_rr(&ts, quantum);
-            else if (strcmp(algs[i], "MLFQ") == 0) run_mlfq(&ts);
+            simulate_scheduler(&ts, algs[i], quantum);
 
             calculate_metrics(temp_p, n);
             printf("%-9s | %6.1f | %6.1f | %6.1f | %16d\n",
@@ -148,18 +145,9 @@ int main(int argc, char *argv[]) {
     s.boost_period = boost;
     s.log_ptr = 0; s.preemption_log[0] = '\0';
     s.context_switches = 0;
+    s.alg_data = NULL;
 
-    int status = -1;
-    if (strcmp(algorithm, "FCFS") == 0) { run_fcfs(&s); status = 0; }
-    else if (strcmp(algorithm, "SJF") == 0) { run_sjf(&s); status = 0; }
-    else if (strcmp(algorithm, "STCF") == 0) { run_stcf(&s); status = 0; }
-    else if (strcmp(algorithm, "RR") == 0) { run_rr(&s, quantum); status = 0; }
-    else if (strcmp(algorithm, "MLFQ") == 0) { run_mlfq(&s); status = 0; }
-
-    if (status != 0) {
-        printf("Scheduling failed: algorithm '%s' not recognized\n", algorithm);
-        return 1;
-    }
+    simulate_scheduler(&s, algorithm, quantum);
 
     print_gantt_chart(&g);
     calculate_metrics(processes, n);
