@@ -23,28 +23,44 @@ void print_gantt_chart(GanttChart *g) {
 
     printf("\n=== Gantt Chart ===\n");
 
-    // Print blocks
+    int block_widths[MAX_TIMELINE];
+    int total_width = 0;
+
+    // Print blocks and calculate widths
     for (int i = 0; i < g->count; i++) {
         int duration = (i == 0) ? g->times[0] : (g->times[i] - g->times[i-1]);
-        if (duration <= 0) continue;
+        if (duration <= 0) {
+            block_widths[i] = 0;
+            continue;
+        }
         
-        int scale = (duration + 19) / 20; // Scale: 1 char per 20 units
+        int scale = (duration + 9) / 10; 
+        block_widths[i] = strlen(g->pids[i]) + 2 + scale;
         printf("[%s", g->pids[i]);
         for (int j = 0; j < scale; j++) printf("-");
         printf("]");
     }
     
     printf("\nTime: 0");
+    int current_pos = 7; // "Time: 0" ends at pos 7 (0 is at pos 6)
+    
     for (int i = 0; i < g->count; i++) {
-        int duration = (i == 0) ? g->times[0] : (g->times[i] - g->times[i-1]);
-        if (duration <= 0) continue;
+        if (block_widths[i] == 0) continue;
         
-        int scale = (duration + 19) / 20;
-        int width = strlen(g->pids[i]) + 2 + scale;
+        total_width += block_widths[i];
         
-        // Print spaces to align next marker
-        for (int j = 0; j < width - 1; j++) printf(" ");
-        printf("%d", g->times[i]);
+        char marker[16];
+        sprintf(marker, "%d", g->times[i]);
+        int marker_len = strlen(marker);
+        
+        int target_pos = total_width;
+        int spaces_needed = target_pos - current_pos;
+        
+        if (spaces_needed < 0) spaces_needed = 1; // Safety
+        
+        for (int j = 0; j < spaces_needed; j++) printf(" ");
+        printf("%s", marker);
+        current_pos = target_pos + marker_len;
     }
     printf("\n");
 }

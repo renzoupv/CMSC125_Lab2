@@ -40,6 +40,19 @@ double avg_response(Process *processes, int n) {
 
 void print_metrics(Process *processes, int n) {
     printf("\n=== Metrics ===\n");
+    
+    // Print individual process formulas first as required
+    for (int i = 0; i < n; i++) {
+        Process *p = &processes[i];
+        printf("Process %s:\n", p->pid);
+        printf("  Arrival Time:     %d\n", p->arrival_time);
+        printf("  Burst Time:       %d\n", p->burst_time);
+        printf("  Finish Time:      %d\n", p->finish_time);
+        printf("  Turnaround Time:  %d - %d = %d\n", p->finish_time, p->arrival_time, p->turnaround_time);
+        printf("  Waiting Time:     %d - %d = %d\n", p->turnaround_time, p->burst_time, p->waiting_time);
+        printf("  Response Time:    %d - %d = %d\n\n", p->start_time, p->arrival_time, p->response_time);
+    }
+
     printf("Process | AT  | BT  | FT  | TT  | WT  | RT  \n");
     printf("--------|-----|-----|-----|-----|-----|-----\n");
     for (int i = 0; i < n; i++) {

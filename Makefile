@@ -17,11 +17,17 @@ SRCS = src/main.c \
 
 OBJS = $(SRCS:.c=.o)
 
+all: schedsim
+
 schedsim: $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+test: schedsim
+	chmod +x tests/test_suite.sh
+	./tests/test_suite.sh
 
 clean:
 	rm -f src/*.o schedsim
