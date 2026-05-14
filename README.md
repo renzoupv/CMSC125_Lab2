@@ -68,3 +68,27 @@ make test
 - **MLFQ Design:** Our MLFQ implementation uses 3 priority levels with decreasing priority and increasing (or infinite) time quantums. It includes a priority boost mechanism every 200 time units to prevent starvation and allotment tracking to prevent gaming the scheduler.
 - **STCF Logging:** The simulator logs both preemptions and resumptions for STCF, allowing for a clear trace of execution for preemptive jobs.
 - **Metrics Calculation:** Detailed formulas are provided in the output to show how TT, WT, and RT are derived for each process.
+
+## Simulation Results & Screenshots
+
+### 1. Automated Test Suite
+The simulator includes a comprehensive test suite that verifies the correctness of all scheduling algorithms against known workloads and edge cases.
+![Test Suite](img/img6.png)
+
+### 2. Algorithm Execution & Gantt Charts
+Each algorithm generates detailed execution logs and Gantt charts. Below are examples of STCF and MLFQ execution.
+
+**STCF Gantt Chart (Preemptive SJF):**
+![STCF Execution](img/img2.png)
+
+**MLFQ Execution Trace & Gantt Chart:**
+The MLFQ implementation demonstrates priority demotion and periodic priority boosting.
+![MLFQ Execution](img/img3.png)
+
+### 3. Comparative Analysis
+The `--compare` mode allows for a direct performance comparison between all algorithms on the same workload.
+![Comparison Mode](img/img4.png)
+
+### 4. Special Case: FCFS Convoy Effect
+The simulator identifies specific scheduling phenomena, such as the convoy effect in FCFS.
+![FCFS Convoy Effect](img/img1.png)
