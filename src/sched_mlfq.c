@@ -1,193 +1,128 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
 #include "scheduler.h"
+#include <stdlib.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 typedef struct {
-    Process *queue[100];
-    int front, rear;
-} Queue;
+    Process *queues[3][MAX_PROCESSES];
+    int front[3], rear[3];
+    int current_quantum;
+    int last_boost;
+    bool enqueued[MAX_PROCESSES];
+} MLFQData;
 
-static void init_queue(Queue *q) {
-    q->front = q->rear = 0;
+static void mlfq_enqueue(MLFQData *data, int q_idx, Process *p) {
+    data->queues[q_idx][data->rear[q_idx]++] = p;
 }
 
-static void enqueue(Queue *q, Process *p) {
-    q->queue[q->rear++] = p;
+static Process* mlfq_dequeue(MLFQData *data, int q_idx) {
+    if (data->front[q_idx] == data->rear[q_idx]) return NULL;
+    return data->queues[q_idx][data->front[q_idx]++];
 }
 
-static Process *dequeue(Queue *q) {
-    if (q->front == q->rear) return NULL;
-    return q->queue[q->front++];
-}
+Process* select_mlfq(SchedulerState *s) {
+    if (s->alg_data == NULL) {
+        s->alg_data = calloc(1, sizeof(MLFQData));
+        MLFQData *data = (MLFQData*)s->alg_data;
+        data->last_boost = 0;
+        printf("\n=== MLFQ Configuration ===\n");
+        printf("Queue 0: q=%d, allotment=%d (highest priority)\n", s->q0_quantum, s->q0_allotment);
+        printf("Queue 1: q=%d, allotment=%d\n", s->q1_quantum, s->q1_allotment);
+        printf("Queue 2: FCFS (lowest priority)\n");
+        printf("Boost period: %d\n", s->boost_period);
+        printf("\n=== Execution Trace ===\n");
+    }
+    MLFQData *data = (MLFQData*)s->alg_data;
 
-static int is_empty(Queue *q) {
-    return q->front == q->rear;
-}
+    // 1. Priority Boost
+    if (s->time > 0 && s->time - data->last_boost >= s->boost_period) {
+        printf("t=%d:  Priority boost: all processes -> Q0\n", s->time);
+        for (int i = 0; i < s->n; i++) {
+            if (s->processes[i].remaining_time > 0) {
+                s->processes[i].priority = 0;
+                s->processes[i].allotment_remaining = s->q0_allotment;
+            }
+        }
+        // Re-initialize queues to Q0
+        for (int q = 0; q < 3; q++) { data->front[q] = data->rear[q] = 0; }
+        for (int i = 0; i < s->n; i++) {
+            if (s->processes[i].remaining_time > 0) {
+                mlfq_enqueue(data, 0, &s->processes[i]);
+                data->enqueued[i] = true;
+            }
+        }
+        data->last_boost = s->time;
+        data->current_quantum = 0;
+    }
 
-static void reset_queues(Queue *q0, Queue *q1, Queue *q2,
-                  Process *processes, int n, int time, SchedulerState *s) {
-
-    printf("t=%d:  Priority boost: all processes -> Q0\n", time);
-
-    init_queue(q0);
-    init_queue(q1);
-    init_queue(q2);
-
-    for (int i = 0; i < n; i++) {
-        if (processes[i].remaining_time > 0) {
-            processes[i].priority = 0;
-            processes[i].allotment_remaining = s->q0_allotment;
-            enqueue(q0, &processes[i]);
+    // 2. Check for new arrivals
+    for (int i = 0; i < s->n; i++) {
+        if (s->processes[i].arrival_time <= s->time && !data->enqueued[i]) {
+            s->processes[i].priority = 0;
+            s->processes[i].allotment_remaining = s->q0_allotment;
+            mlfq_enqueue(data, 0, &s->processes[i]);
+            data->enqueued[i] = true;
+            printf("t=%d:   Process %s enters Q0\n", s->time, s->processes[i].pid);
         }
     }
-}
 
-void run_mlfq(SchedulerState *s) {
-    Process *p = s->processes;
-    int n = s->n;
-    Queue q0, q1, q2;
-    init_queue(&q0);
-    init_queue(&q1);
-    init_queue(&q2);
+    static Process *current = NULL;
 
-    int time = 0;
-    int last_boost = 0;
-    Process *last_p = NULL;
+    // 3. Determine if current process should continue
+    int q = (current && current->priority == 0) ? s->q0_quantum : 
+            (current && current->priority == 1) ? s->q1_quantum : 1000000;
 
-    printf("\n=== MLFQ Configuration ===\n");
-    printf("Queue 0: q=%d, allotment=%d (highest priority)\n", s->q0_quantum, s->q0_allotment);
-    printf("Queue 1: q=%d, allotment=%d\n", s->q1_quantum, s->q1_allotment);
-    printf("Queue 2: FCFS (lowest priority)\n");
-    printf("Boost period: %d\n", s->boost_period);
-
-    printf("\n=== Execution Trace ===\n");
-
-    // init
-    bool enqueued[MAX_PROCESSES] = {false};
-    for (int i = 0; i < n; i++) {
-        p[i].priority = 0;
-        p[i].allotment_remaining = s->q0_allotment;
-        p[i].start_time = -1;
-    }
-
-    while (1) {
-        // ... (completion check) ...
-        int done = 1;
-        for (int i = 0; i < n; i++) {
-            if (p[i].remaining_time > 0) {
-                done = 0;
+    bool switch_needed = false;
+    if (current == NULL || current->remaining_time == 0) switch_needed = true;
+    else if (data->current_quantum >= q) switch_needed = true;
+    else if (current->allotment_remaining <= 0) switch_needed = true;
+    else {
+        // Preemption check: if something is in a higher queue
+        for (int i = 0; i < current->priority; i++) {
+            if (data->front[i] != data->rear[i]) {
+                switch_needed = true;
                 break;
             }
         }
-        if (done) break;
-
-        // check for arrivals
-        for (int i = 0; i < n; i++) {
-            if (p[i].arrival_time <= time && !enqueued[i]) {
-                p[i].priority = 0;
-                p[i].allotment_remaining = s->q0_allotment;
-                enqueue(&q0, &p[i]);
-                enqueued[i] = true;
-                printf("t=%d:   Process %s enters Q0\n", time, p[i].pid);
-            }
-        }
-
-        // priority boost
-        if (time - last_boost >= s->boost_period && time > 0) {
-            reset_queues(&q0, &q1, &q2, p, n, time, s);
-            last_boost = time;
-        }
-
-        Process *current = NULL;
-        int quantum = 0;
-
-        // pick queue
-        if (!is_empty(&q0)) {
-            current = dequeue(&q0);
-            quantum = s->q0_quantum;
-        }
-        else if (!is_empty(&q1)) {
-            current = dequeue(&q1);
-            quantum = s->q1_quantum;
-        }
-        else if (!is_empty(&q2)) {
-            current = dequeue(&q2);
-            quantum = 1000000; // FCFS runs until completion
-        }
-
-        if (current == NULL) {
-            time++;
-            continue;
-        }
-
-        if (last_p != NULL && last_p != current) {
-            s->context_switches++;
-        }
-
-        if (current->start_time == -1) {
-            current->start_time = time;
-        }
-
-        int run_time = 0;
-        while (run_time < quantum && current->remaining_time > 0) {
-            current->remaining_time--;
-            current->allotment_remaining--;
-            time++;
-            run_time++;
-            add_gantt_entry(s->gantt, current->pid, time);
-
-            // check for new arrivals (preemption)
-            bool preempted = false;
-            for (int i = 0; i < n; i++) {
-                if (p[i].arrival_time <= time && !enqueued[i]) {
-                    p[i].priority = 0;
-                    p[i].allotment_remaining = s->q0_allotment;
-                    enqueue(&q0, &p[i]);
-                    enqueued[i] = true;
-                    printf("t=%d:   Process %s enters Q0\n", time, p[i].pid);
-                    if (current->priority > 0) {
-                        preempted = true;
-                    }
-                }
-            }
-
-            if (time - last_boost >= s->boost_period) break;
-            if (preempted) break;
-        }
-
-        last_p = current;
-
-        if (current->remaining_time == 0) {
-            current->finish_time = time;
-            printf("t=%d:  Process %s completes in Q%d\n", time, current->pid, current->priority);
-            continue;
-        }
-
-        // Demotion / Re-enqueue
-        if (current->allotment_remaining <= 0) {
-            if (current->priority == 0) {
-                current->priority = 1;
-                current->allotment_remaining = s->q1_allotment;
-                enqueue(&q1, current);
-                printf("t=%d:  Process %s -> Q1 (exhausted Q0 allotment)\n", time, current->pid);
-            }
-            else if (current->priority == 1) {
-                current->priority = 2;
-                current->allotment_remaining = 1000000; // Infinite for Q2
-                enqueue(&q2, current);
-                printf("t=%d:  Process %s -> Q2 (exhausted Q1 allotment)\n", time, current->pid);
-            }
-            else {
-                enqueue(&q2, current);
-            }
-        } else {
-            // Put back in same queue (preempted or boost)
-            if (current->priority == 0) enqueue(&q0, current);
-            else if (current->priority == 1) enqueue(&q1, current);
-            else enqueue(&q2, current);
-        }
     }
-    s->time = time;
+
+    if (switch_needed) {
+        if (current != NULL) {
+            if (current->remaining_time == 0) {
+                printf("t=%d:  Process %s completes in Q%d\n", s->time, current->pid, current->priority);
+            } else if (current->allotment_remaining <= 0) {
+                if (current->priority == 0) {
+                    current->priority = 1;
+                    current->allotment_remaining = s->q1_allotment;
+                    mlfq_enqueue(data, 1, current);
+                    printf("t=%d:  Process %s -> Q1 (exhausted Q0 allotment)\n", s->time, current->pid);
+                } else if (current->priority == 1) {
+                    current->priority = 2;
+                    current->allotment_remaining = 1000000;
+                    mlfq_enqueue(data, 2, current);
+                    printf("t=%d:  Process %s -> Q2 (exhausted Q1 allotment)\n", s->time, current->pid);
+                } else {
+                    mlfq_enqueue(data, 2, current);
+                }
+            } else {
+                // Preempted or quantum expired, re-enqueue in same priority
+                mlfq_enqueue(data, current->priority, current);
+            }
+        }
+
+        // Pick next
+        current = NULL;
+        for (int i = 0; i < 3; i++) {
+            current = mlfq_dequeue(data, i);
+            if (current != NULL) break;
+        }
+        data->current_quantum = 0;
+    }
+
+    if (current != NULL) {
+        data->current_quantum++;
+        current->allotment_remaining--;
+    }
+
+    return current;
 }

@@ -1,0 +1,6 @@
+# Identical burst time test for SJF
+A 0 50
+B 10 50
+C 20 50
+D 30 50
+E 40 50

@@ -1,0 +1,6 @@
+# Simultaneous arrival test
+A 0 50
+B 0 30
+C 0 10
+D 0 40
+E 0 20

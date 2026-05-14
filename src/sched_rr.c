@@ -1,87 +1,51 @@
 #include "scheduler.h"
-#include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 
 typedef struct {
-    Process *queue[100];
+    Process *queue[MAX_PROCESSES];
     int front, rear;
-} Queue;
+    int current_quantum;
+    bool enqueued[MAX_PROCESSES];
+} RRData;
 
-static void init_queue(Queue *q) {
-    q->front = q->rear = 0;
-}
+Process* select_rr(SchedulerState *s, int q) {
+    if (s->alg_data == NULL) {
+        s->alg_data = calloc(1, sizeof(RRData));
+        RRData *data = (RRData*)s->alg_data;
+        data->current_quantum = 0;
+    }
+    RRData *data = (RRData*)s->alg_data;
 
-static void enqueue(Queue *q, Process *p) {
-    q->queue[q->rear++] = p;
-}
-
-static Process *dequeue(Queue *q) {
-    if (q->front == q->rear) return NULL;
-    return q->queue[q->front++];
-}
-
-void run_rr(SchedulerState *s, int q) {
-    int time = 0;
-    int finished_count = 0;
-    bool enqueued[MAX_PROCESSES] = {false};
-    Queue ready_queue;
-    init_queue(&ready_queue);
-    
-    s->context_switches = 0;
-    Process *last_p = NULL;
-
-    while (finished_count < s->n) {
-        // 1. Check for new arrivals at current time
-        for (int i = 0; i < s->n; i++) {
-            if (s->processes[i].arrival_time <= time && !enqueued[i]) {
-                enqueue(&ready_queue, &s->processes[i]);
-                enqueued[i] = true;
-            }
-        }
-
-        // 2. Pick next process
-        Process *current = dequeue(&ready_queue);
-        
-        if (current == NULL) {
-            time++;
-            continue;
-        }
-
-        // Context switch tracking: happens if we switch from one process to another
-        if (last_p != NULL && last_p != current) {
-            s->context_switches++;
-        }
-
-        if (current->start_time == -1) {
-            current->start_time = time;
-        }
-
-        // 3. Run for quantum or until completion
-        int run_time = 0;
-        while (run_time < q && current->remaining_time > 0) {
-            current->remaining_time--;
-            time++;
-            run_time++;
-            add_gantt_entry(s->gantt, current->pid, time);
-
-            // 4. Check for arrivals during execution
-            for (int i = 0; i < s->n; i++) {
-                if (s->processes[i].arrival_time <= time && !enqueued[i]) {
-                    enqueue(&ready_queue, &s->processes[i]);
-                    enqueued[i] = true;
-                }
-            }
-        }
-
-        last_p = current;
-
-        if (current->remaining_time == 0) {
-            current->finish_time = time;
-            finished_count++;
-        } else {
-            // Quantum expired, re-enqueue
-            enqueue(&ready_queue, current);
+    // 1. Check for new arrivals
+    for (int i = 0; i < s->n; i++) {
+        if (s->processes[i].arrival_time <= s->time && !data->enqueued[i]) {
+            data->queue[data->rear++] = &s->processes[i];
+            data->enqueued[i] = true;
         }
     }
-    s->time = time;
+
+    static Process *current = NULL;
+
+    // 2. If quantum expired or process finished, pick next
+    if (current == NULL || current->remaining_time == 0 || data->current_quantum >= q) {
+        
+        // If quantum expired but not finished, put back at end
+        if (current != NULL && current->remaining_time > 0) {
+            data->queue[data->rear++] = current;
+        }
+
+        if (data->front == data->rear) {
+            current = NULL;
+        } else {
+            current = data->queue[data->front++];
+        }
+        data->current_quantum = 0;
+    }
+
+    if (current != NULL) {
+        data->current_quantum++;
+    }
+
+    return current;
 }

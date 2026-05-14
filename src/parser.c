@@ -15,7 +15,6 @@ int parse_file(char *filename, Process *processes) {
     char line[256];
 
     while (fgets(line, sizeof(line), fp)) {
-
         if (line[0] == '#' || strlen(line) < 3)
             continue;
 
@@ -23,8 +22,14 @@ int parse_file(char *filename, Process *processes) {
         int at, bt;
 
         if (sscanf(line, "%s %d %d", pid, &at, &bt) == 3) {
-            init_process(&processes[count], pid, at, bt);
-            count++;
+            if (count < MAX_PROCESSES) {
+                init_process(&processes[count], pid, at, bt);
+                count++;
+            } else {
+                printf("Warning: MAX_PROCESSES reached (%d)\n", MAX_PROCESSES);
+            }
+        } else {
+            printf("Warning: Failed to parse line: %s", line);
         }
     }
 

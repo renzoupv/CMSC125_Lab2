@@ -1,50 +1,31 @@
 #include "scheduler.h"
+#include <stddef.h>
 
-static int pick_sjf(SchedulerState *s, int time) {
-    int idx = -1;
+Process* select_sjf(SchedulerState *s) {
+    static Process *current = NULL;
+
+    // Non-preemptive: keep running current until done
+    if (current != NULL && current->remaining_time > 0) {
+        return current;
+    }
+
+    Process *selected = NULL;
+    int shortest_burst = 2147483647;
 
     for (int i = 0; i < s->n; i++) {
-        if (s->processes[i].arrival_time <= time &&
-            s->processes[i].remaining_time > 0) {
-
-            if (idx == -1 ||
-                s->processes[i].burst_time < s->processes[idx].burst_time) {
-                idx = i;
+        if (s->processes[i].remaining_time > 0 && s->processes[i].arrival_time <= s->time) {
+            if (s->processes[i].burst_time < shortest_burst) {
+                shortest_burst = s->processes[i].burst_time;
+                selected = &s->processes[i];
+            } else if (s->processes[i].burst_time == shortest_burst) {
+                // Tie-breaker: earliest arrival
+                if (selected == NULL || s->processes[i].arrival_time < selected->arrival_time) {
+                    selected = &s->processes[i];
+                }
             }
         }
     }
-    return idx;
-}
 
-void run_sjf(SchedulerState *s) {
-    int time = 0;
-
-    for (;;) {
-        int done = 1;
-        for (int i = 0; i < s->n; i++)
-            if (s->processes[i].remaining_time > 0)
-                done = 0;
-
-        if (done) break;
-
-        int idx = pick_sjf(s, time);
-
-        if (idx == -1) {
-            time++;
-            continue;
-        }
-
-        Process *p = &s->processes[idx];
-
-        if (p->start_time == -1)
-            p->start_time = time;
-
-        while (p->remaining_time > 0) {
-            p->remaining_time--;
-            time++;
-            add_gantt_entry(s->gantt, p->pid, time);
-        }
-
-        p->finish_time = time;
-    }
+    current = selected;
+    return selected;
 }

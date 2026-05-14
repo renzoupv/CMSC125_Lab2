@@ -1,7 +1,7 @@
 #ifndef PROCESS_H
 #define PROCESS_H
 
-#define MAX_PROCESSES 100
+#define MAX_PROCESSES 256
 
 typedef struct {
     char pid[16];
